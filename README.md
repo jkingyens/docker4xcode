@@ -1,6 +1,16 @@
 # dockerthon
 Build and ship iOS and Mac native apps with the docker client
 
+# User Story
+
+  * add a Dockerfile to the root of your XCode Project
+  * run 'docker build' from the project root and xcode build process is invoked
+  * user can see build log stream similar to linux image builds today
+  * image is created and stored in the server
+  * "docker run" invokes the "container" in the simulator
+  * "docker push" will send the app container to testflight/itunes connect
+  * capture push status values/messages and show them in the docker client output
+
 # Resources
 
 [XCode Continuous integration talk at WWDC](https://developer.apple.com/videos/wwdc/2015/?id=410)
