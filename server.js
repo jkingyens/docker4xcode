@@ -8,10 +8,14 @@ var tar = require('tar');
 var uuid = require('node-uuid');
 var path = require('path');
 var cp = require('child_process');
+var mkdirp = require('mkdirp');
+var ncp = require('ncp');
+var gfs = require('get-folder-size');
 
 var tmpDir = path.normalize(os.tmpdir() + '/' + uuid.v4());
 console.log('xcode docker deamon loaded');
 console.log('filesystem path: ', tmpDir);
+mkdirp(tmpDir);
 
 var app = express();
 
@@ -246,71 +250,165 @@ app.post('/v1.18/images/create', function (req, res) {
 // build an image from a build context + Dockerfile
 app.post('/v1.18/build', function (req, res) {
 
+  var repo = req.query.t;
+
+  console.log(repo);
+
   // stream the build context locally
-  var tmpDir = os.tmpdir() + '/' + uuid.v4();
+  var buildImageId = uuid.v4();
+  var re = new RegExp('-', 'g');
+  buildImageId = buildImageId.replace(re, '');
+  var imageDir = tmpDir + '/' + buildImageId;
+
+  // parse the image name and the tag name
 
   // stream the contents from a tarball, unpack into directory
   req.pipe(tar.Extract({
-    path: tmpDir
+    path: imageDir
   })).on('end', function () {
 
-    // read the dockerfile, support a strict subset of docker
+    // read the dockerfile
+    var dockerfile = fs.readFileSync(imageDir + '/Dockerfile');
 
-    // verify the base image comes FROM scratch
+    var dockerfile_lines = dockerfile.toString().split('\n');
 
-    // verify the entrypoint exists
+    // verify the base image
+    var fromline = dockerfile_lines[0];
 
-    // lets just run the docker build in an xcode environment
-    var dockercmd = cp.spawn('xcodebuild', [ ], { 
-      cwd: tmpDir
-    });
+    // extract version
+    var version = fromline.toString().replace('FROM Xcode:', '');
 
-    res.status(200);
-    res.type('application/json');
-
-    // pipe the output into a string buffer
-    dockercmd.stdout.on('data', function (data) { 
-
-      var chunk = data.toString();
-      res.write(JSON.stringify({ 
-        stream: chunk
-      }));
+    // extract the xcode version and run xcodeselect to choose platform
+    var xcodeselect = cp.spawn('xcode-select', ['-s', '/Applications/Xcode-' + version + '.app/Contents/Developer' ], { 
 
     });
 
-    var errStream = '';
-    dockercmd.stderr.on('data', function (data) { 
+    xcodeselect.on('exit', function ()  {
 
-      var chunk = data.toString();
-      errStream += chunk;
+      var runline = dockerfile_lines[3];
 
-    });
+      // parse the run cmd
+      var runcmd = runline.replace('RUN ', '');
 
-    // wait for docker client to complete
-    dockercmd.on('close', function () { 
+      // execute the RUN command
+      var dockercmd = cp.spawn(runcmd, [ ], { 
+        cwd: imageDir
+      });
 
-      if (errStream.length !== 0) { 
+      res.status(200);
+      res.type('application/json');
 
+      // pipe the output into a string buffer
+      dockercmd.stdout.on('data', function (data) { 
+
+        var chunk = data.toString();
         res.write(JSON.stringify({ 
-          error: 'xcode build error', 
-          errorDetail: { 
-            code: -1,
-            message: 'blah blah blah'
-          }
+          stream: chunk
         }));
 
-        return res.end();
-      }
+      });
 
-      // lets copy the resulting project to a docker "image" on the filesystem
+      var errStream = '';
+      dockercmd.stderr.on('data', function (data) { 
 
-      // write some JSON metadata for describing the image
+        var chunk = data.toString();
+        errStream += chunk;
 
-      res.write(JSON.stringify({
-        stream: 'build complete\n'
-      }));
+      });
 
-      res.end();
+      // wait for docker client to complete
+      dockercmd.on('close', function () { 
+
+        if (errStream.length !== 0) { 
+
+          res.write(JSON.stringify({ 
+            error: 'xcode build error', 
+            errorDetail: { 
+              code: -1,
+              message: 'blah blah blah'
+            }
+          }));
+
+          return res.end();
+        }
+
+        // read the hydrate command and convert the iOS app bits
+        var hydrateline = dockerfile_lines[4];
+        var hydratefile = hydrateline.replace('HYDRATE ', '');
+        var imagepath = imageDir + hydratefile;
+
+        // make sure the hydrate file exists, otherwise throw error
+        var fileExists = fs.existsSync(imagepath);
+
+        if (!fileExists) { 
+
+          res.write(JSON.stringify({ 
+            error: 'file to hydrate does not exist', 
+            errorDetail: { 
+              code: -1,
+              message: 'blah blah blah'
+            }
+          }));
+
+          return res.end();
+
+        }
+
+        // write the file data to a new image
+        var newImageId = uuid.v4();
+        var re = new RegExp('-', 'g');
+        newImageId = newImageId.replace(re, '');
+        var iosImagePath = tmpDir + '/' + newImageId;
+        ncp(imagepath, iosImagePath, function () { 
+
+          var images = { };
+          if (fs.existsSync(tmpDir + '/images.json')) { 
+            images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
+          }
+
+          // other stuff that we can add here?
+          var created = new Date();
+
+          gfs(iosImagePath, function (err, iosSize) { 
+
+            gfs(imageDir, function (err, buildSize) { 
+
+              console.log(iosSize);
+
+              console.log(buildSize);
+
+              // image entry for the build workspace
+              images[buildImageId] = { 
+                created: created,
+                path: imageDir,
+                repo: repo + '-build', 
+                size: buildSize
+              };
+
+              // add dictionary entries for these two new images
+              images[newImageId] = {  
+                created: created,
+                path: iosImagePath,
+                repo: repo,
+                size: iosSize
+              };
+
+              // write the image data back out to the filesystem
+              fs.writeFileSync(tmpDir + '/images.json', JSON.stringify(images, null, 2), 'utf8');
+
+              res.write(JSON.stringify({
+                stream: 'build complete\n'
+              }));
+
+              res.end();
+
+            });
+
+          });
+
+        });
+
+      });
 
     });
 
@@ -330,7 +428,7 @@ app.get('/v1.18/images/:name/json', function (req, res) {
     Id: 'abc123',
     Parent: 'opencl-1.2',
     Cmd: [ '/bin/bash' ],
-    Size: 100
+    Size: 0
   });
 
 });
@@ -338,18 +436,37 @@ app.get('/v1.18/images/:name/json', function (req, res) {
 // list images
 app.get('/v1.18/images/json', function (req, res) {
 
-  res.json([
-    {
+  // read the image data from the filesystem
+
+  var images = { };
+  if (fs.existsSync(tmpDir + '/images.json')) { 
+    images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
+  }
+
+  // iterate through objects in the hash
+  var keys = Object.keys(images);
+
+  var outputImages = [ ];
+  keys.forEach(function (imageId) {  
+
+    // TODO: date not working for some reason
+    var blah = new Date(images[imageId].created);
+    console.log(blah);
+
+    // get data from images[imageId] 
+    outputImages.push({ 
       RepoTags: [
-        'ubuntu:latest',
-        'ubuntu:12.04'
+        images[imageId].repo + ':latest'
       ],
-      Id: 'abc123',
-      Created: new Date().getTime(),
-      Size: 100,
-      VirtualSize: 0
-    }
-  ]);
+      Id: imageId,
+      Created: blah.getTime(),
+      Size: images[imageId].size,
+      VirtualSize: images[imageId].size
+    });
+
+  });
+
+  res.json(outputImages);
 
 });
 

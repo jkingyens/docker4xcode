@@ -1,4 +1,4 @@
-FROM Xcode:6.3.2
+FROM Xcode:7.0
 WORKDIR /
 COPY . /
 RUN xcodebuild
