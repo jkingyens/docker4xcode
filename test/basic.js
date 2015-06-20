@@ -9,6 +9,8 @@ var uuid = require('node-uuid');
 
 describe('build', function (cb) { 
 
+	this.timeout(30000);
+
 	it('should build a basic ios sample application', function (cb) { 
 
 		// create the web server
@@ -58,10 +60,7 @@ describe('build', function (cb) {
 					}
 
 					// scan the string buffer for the correct text output
-
-					// should contain an image that represents the build artifcats
-
-					// should contain an image that represents the ios image
+					stream.indexOf('build complete').should.not.equal(-1);
 
 					// shut down the http server
 					test_unit.on('close', function () { 
@@ -81,17 +80,112 @@ describe('build', function (cb) {
 
 describe('images', function (cb) { 
 
+	// allow for long builds
+	this.timeout(30000);
+
 	it('should list both the build artifact and the ios container image', function (cb) { 
 
-		// run the above test
+		// create the web server
+		var test_unit = server.createServer(3000, function () { 
 
-		// run 'dcoker images'
+			// create a temporary directory
+			var tmpdir = path.normalize(os.tmpdir() + '/' + uuid.v4());
 
-		// stream the output to a string
+			// copy the sample application into this directory
+			ncp.ncp(__dirname + '/../sample', tmpdir, function (err) { 
 
-		// compare the output string to see whether things 
+				if (err) { 
+					return cb(err);
+				}
 
-		cb();
+				// invoke the docker client with the correct environment variables
+				var dockercmd = cp.spawn('/usr/local/bin/docker', ['build', '-t=test_ios_app',  '.'], { 
+					cwd: tmpdir,
+					env: { 
+						'DOCKER_HOST': 'tcp://localhost:3000'
+					}
+				});
+
+				// pipe the output into a string buffer
+				var stream2 = '';
+				dockercmd.stdout.on('data', function (data) { 
+
+					var chunk = data.toString();
+					stream2 += chunk;
+
+				});
+
+				var errStream2 = '';
+				dockercmd.stderr.on('data', function (data) { 
+
+					var chunk = data.toString();
+					errStream2 += chunk;
+
+				});
+
+				// wait for docker client to complete
+				dockercmd.on('close', function () { 
+
+					// if there was an error then test failed
+					if (errStream2.length !== 0) { 
+						return cb(new Error(errStream));
+					}
+
+					// scan the string buffer for the correct text output
+					stream2.indexOf('build complete').should.not.equal(-1);
+
+					// run 'docker images'
+					var dockercmd = cp.spawn('/usr/local/bin/docker', ['images'], { 
+						cwd: tmpdir,
+						env: { 
+							'DOCKER_HOST': 'tcp://localhost:3000'
+						}
+					});
+
+					// pipe the output into a string buffer
+					var stream = '';
+					dockercmd.stdout.on('data', function (data) { 
+
+						var chunk = data.toString();
+						stream += chunk;
+
+					});
+
+					var errStream = '';
+					dockercmd.stderr.on('data', function (data) { 
+
+						var chunk = data.toString();
+						errStream += chunk;
+
+					});
+
+					// wait for docker client to complete
+					dockercmd.on('close', function () { 
+
+						// if there was an error then test failed
+						if (errStream.length !== 0) { 
+							return cb(new Error(errStream));
+						}
+
+						// should contain an image that represents the build artifcats
+						stream.indexOf('test-ios-app-build').should.not.equal(-1);
+
+						// should contain an image that represents the ios image
+						stream.indexOf('test-ios-app').should.not.equal(-1);
+
+						// shut down the http server
+						test_unit.on('close', function () { 
+							cb();
+						});
+						test_unit.close();
+
+					});
+
+				});
+
+			});
+
+		});
 
 	});
 

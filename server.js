@@ -7,6 +7,7 @@ var os = require('os');
 var tar = require('tar');
 var uuid = require('node-uuid');
 var path = require('path');
+var cp = require('child_process');
 
 var tmpDir = path.normalize(os.tmpdir() + '/' + uuid.v4());
 console.log('xcode docker deamon loaded');
@@ -247,7 +248,6 @@ app.post('/v1.18/build', function (req, res) {
 
   // stream the build context locally
   var tmpDir = os.tmpdir() + '/' + uuid.v4();
-  console.log(tmpDir);
 
   // stream the contents from a tarball, unpack into directory
   req.pipe(tar.Extract({
@@ -260,8 +260,58 @@ app.post('/v1.18/build', function (req, res) {
 
     // verify the entrypoint exists
 
-    res.json(200, {
-      stream: 'build complete\n'
+    // lets just run the docker build in an xcode environment
+    var dockercmd = cp.spawn('xcodebuild', [ ], { 
+      cwd: tmpDir
+    });
+
+    res.status(200);
+    res.type('application/json');
+
+    // pipe the output into a string buffer
+    dockercmd.stdout.on('data', function (data) { 
+
+      var chunk = data.toString();
+      res.write(JSON.stringify({ 
+        stream: chunk
+      }));
+
+    });
+
+    var errStream = '';
+    dockercmd.stderr.on('data', function (data) { 
+
+      var chunk = data.toString();
+      errStream += chunk;
+
+    });
+
+    // wait for docker client to complete
+    dockercmd.on('close', function () { 
+
+      if (errStream.length !== 0) { 
+
+        res.write(JSON.stringify({ 
+          error: 'xcode build error', 
+          errorDetail: { 
+            code: -1,
+            message: 'blah blah blah'
+          }
+        }));
+
+        return res.end();
+      }
+
+      // lets copy the resulting project to a docker "image" on the filesystem
+
+      // write some JSON metadata for describing the image
+
+      res.write(JSON.stringify({
+        stream: 'build complete\n'
+      }));
+
+      res.end();
+
     });
 
   });
