@@ -1,6 +1,21 @@
 # dockerthon
 Build and ship iOS and Mac native apps with the docker client
 
+# getting started
+
+## running tests
+
+```
+npm install 
+npm test
+```
+
+## running daemon
+```
+npm install
+npm start
+```
+
 # User Story
 
   * add a Dockerfile to the root of your XCode Project
