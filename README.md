@@ -1,19 +1,28 @@
 # dockerthon
 Build and ship iOS and Mac native apps with the docker client
 
-# getting started
+# Getting Started
 
-## running tests
+## Running Tests
 
 ```
 npm install 
 npm test
 ```
 
-## running daemon
+## Running Daemon
 ```
 npm install
 npm start
+```
+
+## Running Sample Project
+```
+cd sample
+DOCKER_HOST=tcp://localhost:3000 docker build -t=sample-ios-app .
+<buid output....
+DOCKER_HOST=tcp://localhost:3000 docker images
+<lists build artifact + ios app container>
 ```
 
 # User Story
