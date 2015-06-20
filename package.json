@@ -1,0 +1,20 @@
+{
+  "name": "dockerthon",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "body-parser": "^1.12.3",
+    "express": "^4.12.3",
+    "mocha": "^2.2.5",
+    "morgan": "^1.5.2",
+    "node-uuid": "^1.4.3",
+    "should": "^7.0.1",
+    "tar": "^2.1.0"
+  }
+}

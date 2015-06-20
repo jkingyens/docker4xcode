@@ -1,1 +1,3 @@
 FROM scratch
+RUN .. 
+ENTRYPOINT
