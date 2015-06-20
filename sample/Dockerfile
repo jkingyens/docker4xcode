@@ -1,3 +1,1 @@
 FROM scratch
-RUN .. 
-ENTRYPOINT

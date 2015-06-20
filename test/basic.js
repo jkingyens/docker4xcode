@@ -1,28 +1,79 @@
 var should = require('should');
 var os = require('os');
 var cp = require('child_process');
+var rimraf = require('rimraf');
+var ncp = require('ncp');
+var server = require('../server');
+var path = require('path');
+var uuid = require('node-uuid');
 
 describe('build', function (cb) { 
 
 	it('should build a basic ios sample application', function (cb) { 
 
-		// create a temporary directory
+		// create the web server
+		var test_unit = server.createServer(3000, function () { 
 
-		// copy the sample application into this directory
+			// create a temporary directory
+			var tmpdir = path.normalize(os.tmpdir() + '/' + uuid.v4());
 
-		// invoke the docker client with the correct environment variables
+			// copy the sample application into this directory
+			ncp.ncp(__dirname + '/../sample', tmpdir, function (err) { 
 
-		// 'docker build -t=test_ios_app .'
+				if (err) { 
+					return cb(err);
+				}
 
-		// pipe the output into a string buffer
+				// invoke the docker client with the correct environment variables
+				var dockercmd = cp.spawn('/usr/local/bin/docker', ['build', '-t=test_ios_app',  '.'], { 
+					cwd: tmpdir,
+					env: { 
+						'DOCKER_HOST': 'tcp://localhost:3000'
+					}
+				});
 
-		// scan the string buffer for the correct text output
+				// pipe the output into a string buffer
+				var stream = '';
+				dockercmd.stdout.on('data', function (data) { 
 
-		// should contain an image that represents the build artifcats
+					var chunk = data.toString();
+					stream += chunk;
 
-		// should contain an image that represents the ios image
+				});
 
-		cb();
+				var errStream = '';
+				dockercmd.stderr.on('data', function (data) { 
+
+					var chunk = data.toString();
+					errStream += chunk;
+
+				});
+
+				// wait for docker client to complete
+				dockercmd.on('close', function () { 
+
+					// if there was an error then test failed
+					if (errStream.length !== 0) { 
+						return cb(new Error(errStream));
+					}
+
+					// scan the string buffer for the correct text output
+
+					// should contain an image that represents the build artifcats
+
+					// should contain an image that represents the ios image
+
+					// shut down the http server
+					test_unit.on('close', function () { 
+						cb();
+					});
+					test_unit.close();
+
+				});
+
+			});
+
+		});
 
 	});
 

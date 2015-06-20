@@ -313,5 +313,10 @@ app.delete('/v1.18/images/:name', function (req, res) {
 
 });
 
-var server = http.createServer(app);
-server.listen(3000);
+module.exports.createServer = function (port, cb) { 
+
+  var server = http.createServer(app);
+  server.listen(port, cb);
+  return server;
+
+}
