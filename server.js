@@ -82,6 +82,69 @@ app.get('/v1.18/containers/json', function (req, res) {
 // get container details
 app.get('/v1.18/containers/:id/json', function (req, res) {
 
+  var containers = { };
+  if (fs.existsSync(tmpDir + '/containers.json')) { 
+    containers = JSON.parse(fs.readFileSync(tmpDir + '/containers.json'));
+  }
+
+  // iterate through objects in the hash
+  var keys = Object.keys(containers);
+  var found = null;
+  var foundId = null;
+  keys.forEach(function (containerId) {  
+
+    if (containers[containerId]) { 
+
+      found = containers[containerId];
+      foundId = containerId;
+
+    }
+
+  });
+
+  if (found) { 
+
+    return res.json({
+      Id: req.params.id,
+      Image: 'ubuntu:latest',
+      Name: 'blahblah',
+      State: {
+        Error: "",
+        ExitCode: 9,
+        FinishedAt: new Date().getTime(),
+        Paused: false,
+        Pid: 0,
+        Restarting: false,
+        Running: false,
+        StartedAt: new Date().getTime()
+      }
+    });
+
+      /*
+      return res.json({
+        Created: found.created,
+        Container: 'abc123',
+        ContainerConfig: {
+          Image: 'ubuntu'
+        },
+        Id: foundId,
+        Parent: 'Xcode',
+        Cmd: [ 'xcodebuild' ],
+        Size: found.size
+      });
+
+    */
+
+  } else { 
+
+    res.type('application/json');
+    res.status(404);
+    res.end();
+
+  }
+
+
+  /*
   if (req.params.id == 'ubuntu') {
 
     return res.json(404, {
@@ -89,22 +152,7 @@ app.get('/v1.18/containers/:id/json', function (req, res) {
     });
 
   }
-
-  res.json({
-    Id: req.params.id,
-    Image: 'ubuntu:latest',
-    Name: 'blahblah',
-    State: {
-      Error: "",
-      ExitCode: 9,
-      FinishedAt: new Date().getTime(),
-      Paused: false,
-      Pid: 0,
-      Restarting: false,
-      Running: false,
-      StartedAt: new Date().getTime()
-    }
-  });
+  */
 
 });
 
@@ -174,22 +222,61 @@ app.delete('/v1.18/containers/:id', function (req, res) {
 // create a container
 app.post('/v1.18/containers/create', bodyParser.json(), function (req, res) {
 
+  console.log(req.body);
+  console.log(req.query);
+
   // lookup to ensure this image actually exists
+  var imageName = req.body.Image;
 
   // if the image doesnt exist, then report an error
+  var images = { };
+  if (fs.existsSync(tmpDir + '/images.json')) { 
+    images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
+  }
 
-  // if the image does exist, then store this container with image
+  // iterate through objects in the hash
+  var keys = Object.keys(images);
+  var found = null;
+  var foundId = null;
+  keys.forEach(function (imageId) {  
 
-  // here we can do other kinds of validation with the launch parameters
+    if (images[imageId].repo === imageName) { 
 
-  console.log('image', req.body.Image);
+      found = images[imageId];
+      foundId = imageId;
 
-  res.json(201, {
-    Id: 'abc123',
-    Warnings: [
+    }
 
-    ]
   });
+
+  if (found) { 
+
+    var containers = { };
+    if (fs.existsSync(tmpDir + '/containers.json')) { 
+      containers = JSON.parse(fs.readFileSync(tmpDir + '/containers.json'));
+    }
+
+    var containerId = uuid.v4();
+    containers[containerId] =  { 
+      Image: imageName
+    };
+
+    fs.writeFileSync(tmpDir + '/containers.json', JSON.stringify(containers, null, 4));
+
+    res.json(201, {
+      Id: containerId,
+      Warnings: [
+
+      ]
+    });
+
+  } else { 
+
+    res.type('application/json');
+    res.status(404);
+    res.end();
+
+  }
 
 });
 
@@ -209,16 +296,43 @@ app.post('/v1.18/containers/:id/wait', function (req, res) {
 // start a container
 app.post('/v1.18/containers/:id/start', bodyParser.json(), function (req, res) {
 
-  if (req.body.Detach) {
-    console.log('container is detached mode');
+  var containers = { };
+  if (fs.existsSync(tmpDir + '/containers.json')) { 
+    containers = JSON.parse(fs.readFileSync(tmpDir + '/containers.json'));
   }
 
-  if (req.body.Tty) {
-    console.log('allocate a pseudo tty');
+  if (!containers[req.params.id]) { 
+
+    return res.json(404, { 
+      message: 'container not found'
+    });
+
   }
 
-  res.json(204, {
-    message: 'container started'
+  var imageName = containers[req.params.id].Image;
+  var images = { };
+  if (fs.existsSync(tmpDir + '/images.json')) { 
+    images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
+  }
+
+  var keys = Object.keys(images);
+  var found = null;
+  keys.forEach(function (imageId) { 
+    if (images[imageId].repo == imageName) { 
+      found = images[imageId].path;
+    }
+  });
+
+  // invoke the simulator to run this container
+  console.log('invoke sim with app from path: ', found);
+
+  var proc4 = cp.spawn('ios-sim', ['launch', found]);
+  proc4.on('exit', function () { 
+
+    res.json(204, {
+      message: 'container started'
+    });
+
   });
 
 });
@@ -291,7 +405,7 @@ app.post('/v1.18/build', function (req, res) {
       var runcmd = runline.replace('RUN ', '');
 
       // execute the RUN command
-      var dockercmd = cp.spawn(runcmd, [ ], { 
+      var dockercmd = cp.spawn(runcmd, ['-configuration',  'Debug', '-sdk', 'iphonesimulator8.3'], { 
         cwd: imageDir
       });
 
@@ -358,7 +472,7 @@ app.post('/v1.18/build', function (req, res) {
         var newImageId = uuid.v4();
         var re = new RegExp('-', 'g');
         newImageId = newImageId.replace(re, '');
-        var iosImagePath = tmpDir + '/' + newImageId;
+        var iosImagePath = tmpDir + '/' + newImageId + '.app';
         ncp(imagepath, iosImagePath, function () { 
 
           var images = { };
@@ -419,17 +533,47 @@ app.post('/v1.18/build', function (req, res) {
 // inspect an image
 app.get('/v1.18/images/:name/json', function (req, res) {
 
-  res.json({
-    Created: new Date(),
-    Container: 'abc123',
-    ContainerConfig: {
-      Image: 'ubuntu'
-    },
-    Id: 'abc123',
-    Parent: 'opencl-1.2',
-    Cmd: [ '/bin/bash' ],
-    Size: 0
+  var images = { };
+  if (fs.existsSync(tmpDir + '/images.json')) { 
+    images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
+  }
+
+  // iterate through objects in the hash
+  var keys = Object.keys(images);
+  var found = null;
+  var foundId = null;
+  keys.forEach(function (imageId) {  
+
+    if (images[imageId].repo === req.params.name) { 
+
+      found = images[imageId];
+      foundId = imageId;
+
+    }
+
   });
+
+  if (found) { 
+
+      return res.json({
+        Created: found.created,
+        Container: 'abc123',
+        ContainerConfig: {
+          Image: 'ubuntu'
+        },
+        Id: foundId,
+        Parent: 'Xcode',
+        Cmd: [ 'xcodebuild' ],
+        Size: found.size
+      });
+
+  } else { 
+
+    res.type('application/json');
+    res.status(404);
+    res.end();
+
+  }
 
 });
 
@@ -443,15 +587,14 @@ app.get('/v1.18/images/json', function (req, res) {
     images = JSON.parse(fs.readFileSync(tmpDir + '/images.json'));
   }
 
+  var outputImages = [ ];
+
   // iterate through objects in the hash
   var keys = Object.keys(images);
-
-  var outputImages = [ ];
   keys.forEach(function (imageId) {  
 
     // TODO: date not working for some reason
     var blah = new Date(images[imageId].created);
-    console.log(blah);
 
     // get data from images[imageId] 
     outputImages.push({ 
