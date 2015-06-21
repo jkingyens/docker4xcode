@@ -168,10 +168,10 @@ describe('images', function (cb) {
 						}
 
 						// should contain an image that represents the build artifcats
-						stream.indexOf('test-ios-app-build').should.not.equal(-1);
+						stream.indexOf('test_ios_app').should.not.equal(-1);
 
 						// should contain an image that represents the ios image
-						stream.indexOf('test-ios-app').should.not.equal(-1);
+						stream.indexOf('test_ios_app-build').should.not.equal(-1);
 
 						// shut down the http server
 						test_unit.on('close', function () { 
