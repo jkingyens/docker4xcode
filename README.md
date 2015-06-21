@@ -21,7 +21,17 @@ RUN xcodebuild
 HYDRATE /build/Debug-iphonesimulator/SampleApp.app
 ```
 The HYDRATE command instructs the docker builder to transform raw bits
-into a _new_ docker image as an artifact. The architecture is assumed to be iphonesimulator plaform right now.
+into a _new_ docker image as an artifact. The architecture is assumed to be iphonesimulator plaform right now. Hence, docker build will output two images:
+
+```
+REPOSITORY          TAG                 IMAGE ID            CREATED                  VIRTUAL SIZE
+test-build          latest              9240d3d01481        Less than a second ago   8.884 MB
+test                latest              dd5a93fcf2ad        Less than a second ago   8.215 MB
+```
+
+`test-build` contains the full build directory from the OSX platform.
+`test` contains just the ios container (app). 
+you can then `docker run` the `test` image to invoke th simulator
 
 # Usage
 
