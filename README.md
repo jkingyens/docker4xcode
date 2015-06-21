@@ -1,6 +1,17 @@
 # Docker for iOS Development
 Build and ship iOS apps with standard docker client. Just drop a Dockerfile into an XCode project and build+distribute using docker containers.
 
+# Getting Started
+
+## Requirements
+
+  * OSX (tested with 10.10.3)
+  * XCode (tested with 6.3.2)
+  * Node.js (tested with 0.10.32)
+  * ios-sim (npm install -g ios-sim)
+
+Then drop a Dockerfile into your iOS app directory:
+
 ## Example Dockerfile
 ```
 FROM Xcode:7.0
@@ -12,27 +23,28 @@ HYDRATE /build/Debug-iphonesimulator/SampleApp.app
 The HYDRATE command instructs the docker builder to transform raw bits
 into a _new_ docker image as an artifact. The architecture is assumed to be iphonesimulator plaform right now.
 
-# Getting Started
+# Usage
 
-## Requirements
+## Start up the Daemon
+```
+npm install
+npm start
+export DOCKER_HOST=tcp://localhost:3000
+```
 
-  * OSX (tested with 10.10.3)
-  * XCode (tested with 6.3.2)
-  * Node.js (tested with 0.10.32)
-  * ios-sim (npm install -g ios-sim)
+## build & run your apps from CLI:
+```
+docker build -t=test .
+docker run test
+```
+
+# Development
 
 ## Running Tests
 
 ```
 npm install 
 npm test
-```
-
-## Running Daemon
-```
-npm install
-npm start
-export DOCKER_HOST=tcp://localhost:3000
 ```
 
 ## Running Sample Project
@@ -46,5 +58,7 @@ docker run <image_name>
 ```
 
 # Roadmap
-  * App stores = registries
-  * Android build + ship
+  * Complete the REST API 
+  * Registery/store implementations
+  * docker-compose and docker-machine support
+  * Android development

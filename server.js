@@ -29,6 +29,20 @@ app.get('/v1.18/_ping', function (req, res) {
 
 });
 
+app.get('/v1.18/version', function (req, res) { 
+
+  res.json({
+    "Version": "1.6.2",
+    "Os": "darwin",
+    "KernelVersion": "Darwin 14.3.0",
+    "GoVersion": "go1.4.1",
+    "GitCommit": "a8a31ef",
+    "Arch": "amd64",
+    "ApiVersion": "1.18"
+  });
+
+});
+
 app.get('/v1.18/info', function (req, res) {
   res.json({
     Containers: 1,
@@ -39,11 +53,11 @@ app.get('/v1.18/info', function (req, res) {
     ],
     ExecutionDriver: "xcode",
     KernelVersion: "1.2",
-    NCPU: 256,
+    NCPU: 1,
     Memtotal: 2099236864, // total amount of video memory?
     Name: 'docker-xcode',
     Debug: false,
-    OperatingSystem: 'OSX',
+    OperatingSystem: 'darwin',
     MemoryLimit: true,
     SwapLimit: true
   });
@@ -52,30 +66,36 @@ app.get('/v1.18/info', function (req, res) {
 // list containers
 app.get('/v1.18/containers/json', function (req, res) {
 
-  res.json([
-    {
-      Id: 'abc123',
-      Image: 'ubuntu:latest',
-      Command: 'echo 1',
-      Status: 'Exit 0',
-      Ports: 'null',
-      SizeRw: 12288,
-      SizeRootFs: 0,
-      Created: new Date().getTime(),
-      Name: '/blahblah'
-    },
-    {
-      Id: '123abc',
-      Image: 'ubuntu:latest',
-      Command: 'echo 1',
-      Status: 'Exit 0',
-      Ports: 'null',
-      SizeRw: 12288,
-      SizeRootFs: 0,
-      Created: new Date().getTime(),
-      Name: '/blahblahblah'
-    }
-  ]);
+  var containers = { };
+  if (fs.existsSync(tmpDir + '/containers.json')) { 
+    containers = JSON.parse(fs.readFileSync(tmpDir + '/containers.json'));
+  }
+
+  var output_containers = [ ];
+
+  // iterate through objects in the hash
+  var keys = Object.keys(containers);
+  keys.forEach(function (containerId) {  
+
+    output_containers.push({ 
+      Id: containerId,
+      Image: containers[containerId].Image + ':latest',
+      Name: containerId,
+      State: {
+        Error: "",
+        ExitCode: 0,
+        FinishedAt: new Date(),
+        Paused: false,
+        Pid: 0,
+        Restarting: false,
+        Running: false,
+        StartedAt: new Date()
+      }
+    });
+
+  });
+
+  res.json(output_containers);
 
 });
 
@@ -105,9 +125,9 @@ app.get('/v1.18/containers/:id/json', function (req, res) {
   if (found) { 
 
     return res.json({
-      Id: req.params.id,
-      Image: 'ubuntu:latest',
-      Name: 'blahblah',
+      Id: foundId,
+      Image: found.Image + ':latest',
+      Name: foundId,
       State: {
         Error: "",
         ExitCode: 9,
@@ -120,21 +140,6 @@ app.get('/v1.18/containers/:id/json', function (req, res) {
       }
     });
 
-      /*
-      return res.json({
-        Created: found.created,
-        Container: 'abc123',
-        ContainerConfig: {
-          Image: 'ubuntu'
-        },
-        Id: foundId,
-        Parent: 'Xcode',
-        Cmd: [ 'xcodebuild' ],
-        Size: found.size
-      });
-
-    */
-
   } else { 
 
     res.type('application/json');
@@ -142,17 +147,6 @@ app.get('/v1.18/containers/:id/json', function (req, res) {
     res.end();
 
   }
-
-
-  /*
-  if (req.params.id == 'ubuntu') {
-
-    return res.json(404, {
-      message:' container not found'
-    });
-
-  }
-  */
 
 });
 
@@ -257,6 +251,9 @@ app.post('/v1.18/containers/create', bodyParser.json(), function (req, res) {
     }
 
     var containerId = uuid.v4();
+    var re = new RegExp('-', 'g');
+    containerId = containerId.replace(re, '');
+
     containers[containerId] =  { 
       Image: imageName
     };
