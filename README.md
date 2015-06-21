@@ -1,16 +1,16 @@
-# Docker for Mobile Dev (DoMo?)
-Build and ship iOS apps with the docker client. Just drop a Dockerfile into an XCode project and build+distribute using docker containers.
+# Docker for iOS Development
+Build and ship iOS apps with standard docker client. Just drop a Dockerfile into an XCode project and build+distribute using docker containers.
 
 ## Example Dockerfile
 ```
-FROM Xcode:6.3.2
+FROM Xcode:7.0
 WORKDIR /
 COPY . /
 RUN xcodebuild
-HYDRATE /build/Release-iphoneos/SampleApp.app
+HYDRATE /build/Debug-iphonesimulator/SampleApp.app
 ```
-The HYDRATE command instructs the docker build process to transform raw bits
-into a docker image for future runs. The architecture is assumed to be arm[64] iOS plaform right now, but this could be detected and/or set in the future.
+The HYDRATE command instructs the docker builder to transform raw bits
+into a _new_ docker image as an artifact. The architecture is assumed to be iphonesimulator plaform right now.
 
 # Getting Started
 
@@ -19,6 +19,7 @@ into a docker image for future runs. The architecture is assumed to be arm[64] i
   * OSX (tested with 10.10.3)
   * XCode (tested with 6.3.2)
   * Node.js (tested with 0.10.32)
+  * ios-sim (npm install -g ios-sim)
 
 ## Running Tests
 
@@ -41,8 +42,9 @@ docker build -t=sample-ios-app .
 <buid output....>
 docker images
 <image list>
+docker run <image_name>
 ```
 
 # Roadmap
-
-  * Android Development
+  * App stores = registries
+  * Android build + ship
