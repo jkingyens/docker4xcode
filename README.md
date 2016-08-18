@@ -6,7 +6,7 @@ Build and ship iOS apps with standard docker client. Just drop a Dockerfile into
 ## Requirements
 
   * OSX (tested with 10.10.3)
-  * XCode (tested with 6.3.2)
+  * Xcode (tested with 6.3.2)
   * Node.js (tested with 0.10.32)
   * ios-sim (npm install -g ios-sim)
 
