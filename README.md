@@ -1,12 +1,12 @@
 # Docker for iOS Development
-Build and ship iOS apps with standard docker client. Just drop a Dockerfile into an XCode project and build+distribute using docker containers.
+Build and ship iOS apps with standard docker client. Just drop a Dockerfile into an Xсode project and build+distribute using docker containers.
 
 # Getting Started
 
 ## Requirements
 
   * OSX (tested with 10.10.3)
-  * XCode (tested with 6.3.2)
+  * Xcode (tested with 6.3.2)
   * Node.js (tested with 0.10.32)
   * ios-sim (npm install -g ios-sim)
 
@@ -31,7 +31,7 @@ test                latest              dd5a93fcf2ad        Less than a second a
 
 `test-build` contains the full build directory from the OSX platform.
 `test` contains just the ios container (app). 
-you can then `docker run` the `test` image to invoke th simulator
+you can then `docker run` the `test` image to invoke the simulator
 
 # Usage
 
